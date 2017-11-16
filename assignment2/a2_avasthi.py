@@ -36,15 +36,50 @@ def printrgb(name, arr):
 
 def calculateIntensity(name, arr):
 	intensity = np.zeros(shape=(500,500))
-	print(name)
 	for i in range(500):
-		temp = []
 		for j in range(500):
 			rgb = arr[i][j]
-			intensity[i][j] = int((int(rgb[0])+int(rgb[1])+int(rgb[2])/3) * (rgb[3]/100))
-	print(intensity)
+			intensity[i][j] = int(((int(rgb[0])+int(rgb[1])+int(rgb[2]))/3) * (int(rgb[3])/100))	#Q2a		
 	return (name, intensity)
-	
+
+def reduceFactor(fileName, intensityArr):		#Q2b
+	reducedArr = np.zeros(shape=(50,50))
+	k = 0
+	for i in range(50):
+		for j in range(50):
+			arr = np.array(intensityArr)
+			row = i*10
+			col = j*10
+			reducedArr[i][j] = mean(arr[row:row+10, col:col+10])
+	return (fileName, reducedArr)
+
+def mean(arr):
+	sum = 0
+	for i in range(10):
+		for j in range(10):
+			sum += arr[i][j]
+	return sum/100
+
+def matrixDiff(fileName, reducedArr):			#Q2c, Q2d and Q2e
+	temp = np.array(reducedArr)
+	rowDiff = np.diff(reducedArr, axis = 0)
+	colDiff = np.diff(temp, axis = 1)
+	feature = []
+	rowFlat = rowDiff.flatten()
+	colFlat = colDiff.flatten()
+	feature = np.concatenate((rowFlat, colFlat))
+	for i in range(len(feature)):
+		if(feature[i] < -1):
+			feature[i] = -1
+		elif(feature[i] > 1):
+			feature[i] = 1
+		else:
+			feature[i] = 0
+	return (fileName, feature)
+
+def printfeature(name, arr):				#Q2f
+	if(name == '3677454_2025195.zip-1' or name == '3677454_2025195.zip-18'):
+		print(arr)
 
 if __name__ == "__main__":
 
@@ -68,7 +103,10 @@ if __name__ == "__main__":
 	print_blocks.collect()
 
 	intensity = blocks.map(lambda a:calculateIntensity(a[0], a[1]))
-	print(intensity.collect())
+	reduced = intensity.map(lambda a:reduceFactor(a[0], a[1]))
+	major = reduced.map(lambda a:matrixDiff(a[0], a[1]))
+	print_feature = major.map(lambda a:printfeature(a[0], a[1]))
+	print_feature.collect()
 
 
 
