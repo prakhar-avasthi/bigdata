@@ -3,8 +3,11 @@ from tifffile import TiffFile
 import re
 import os
 import io
+import sys
 import zipfile
 import numpy as np
+import hashlib
+import math
 
 def getOrthoTif(zfBytes):
 	#given a zipfile as bytes (i.e. from reading from a binary file),
@@ -34,12 +37,12 @@ def printrgb(name, arr):
 	if(name == '3677454_2025195.zip-0' or name == '3677454_2025195.zip-1' or name == '3677454_2025195.zip-18' or name == '3677454_2025195.zip-19'):
 		print(arr[0][0])
 
-def calculateIntensity(name, arr):
+def calculateIntensity(name, arr):			#Q2a
 	intensity = np.zeros(shape=(500,500))
 	for i in range(500):
 		for j in range(500):
 			rgb = arr[i][j]
-			intensity[i][j] = int(((int(rgb[0])+int(rgb[1])+int(rgb[2]))/3) * (int(rgb[3])/100))	#Q2a		
+			intensity[i][j] = int(((int(rgb[0])+int(rgb[1])+int(rgb[2]))/3) * (int(rgb[3])/100))			
 	return (name, intensity)
 
 def reduceFactor(fileName, intensityArr):		#Q2b
@@ -62,8 +65,8 @@ def mean(arr):
 
 def matrixDiff(fileName, reducedArr):			#Q2c, Q2d and Q2e
 	temp = np.array(reducedArr)
-	rowDiff = np.diff(reducedArr, axis = 0)
-	colDiff = np.diff(temp, axis = 1)
+	rowDiff = np.diff(reducedArr, axis=1)
+	colDiff = np.diff(temp, axis=0)
 	feature = []
 	rowFlat = rowDiff.flatten()
 	colFlat = colDiff.flatten()
@@ -80,6 +83,26 @@ def matrixDiff(fileName, reducedArr):			#Q2c, Q2d and Q2e
 def printfeature(name, arr):				#Q2f
 	if(name == '3677454_2025195.zip-1' or name == '3677454_2025195.zip-18'):
 		print(arr)
+
+def sign(fileName, feature):				#Q3a			
+	bytes = np.zeros(shape=(128))
+	for i in range(128):
+		arr = np.array(feature)
+		row = i*38
+		md = hashlib.md5(arr[row:row+38])
+		digest = md.hexdigest()
+		bit = int(digest, 16)
+		bytes[i] = bin(bit)[3]
+	return (fileName, bytes)
+
+def LSH(fileName, bytes):
+	hashes = np.zeros(shape=(8))
+	for i in range(8):
+		arr = np.array(bytes)
+		row = i*16
+		val = arr[row:row+16]
+		hashes[i] = hash(val.tostring())
+	return (fileName, hashes)
 
 if __name__ == "__main__":
 
@@ -99,15 +122,20 @@ if __name__ == "__main__":
 	image_array = filesRdd.map(lambda a: a[1]).map(lambda x: getOrthoTif(x))	#Q1b
 	file_image_array = filesRdd.map(lambda a: (a[0][a[0].rfind("/")+1:], getOrthoTif(a[1])))
 	blocks = file_image_array.flatMap(lambda a:divideImage(a[0], a[1]))		#Q1d
-	print_blocks = blocks.map(lambda a:printrgb(a[0], a[1]))			#Q1e
-	print_blocks.collect()
+	#print_blocks = blocks.map(lambda a:printrgb(a[0], a[1]))			#Q1e
+	#print_blocks.collect()
 
-	intensity = blocks.map(lambda a:calculateIntensity(a[0], a[1]))
-	reduced = intensity.map(lambda a:reduceFactor(a[0], a[1]))
-	major = reduced.map(lambda a:matrixDiff(a[0], a[1]))
-	print_feature = major.map(lambda a:printfeature(a[0], a[1]))
-	print_feature.collect()
+	intensity = blocks.map(lambda a:calculateIntensity(a[0], a[1]))			#Q2a
+	reduced = intensity.map(lambda a:reduceFactor(a[0], a[1]))			#Q2b
+	major = reduced.map(lambda a:matrixDiff(a[0], a[1]))				#Q2c, Q2d and Q2e
+	#print_feature = major.map(lambda a:printfeature(a[0], a[1]))			#Q2f
+	#print_feature.collect()
 
+	signatures = major.map(lambda a:sign(a[0], a[1]))				#Q3a
+	band = signatures.map(lambda a:LSH(a[0], a[1]))
+	flip = band.flatMap(lambda a:[(x, a[0]+" : ") for x in a[1]])
+	similiar = flip.reduceByKey(lambda a,b:a+b)
+	print(similiar.collect())
 
 
 
