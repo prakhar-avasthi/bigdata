@@ -36,6 +36,7 @@ def divideImage(fileName, imageArr):		#Q1c
 def printrgb(name, arr):
 	if(name == '3677454_2025195.zip-0' or name == '3677454_2025195.zip-1' or name == '3677454_2025195.zip-18' or name == '3677454_2025195.zip-19'):
 		print(arr[0][0])
+	return (name, arr)
 
 def calculateIntensity(name, arr):			#Q2a
 	intensity = np.zeros(shape=(500,500))
@@ -78,6 +79,8 @@ def matrixDiff(fileName, reducedArr):			#Q2c, Q2d and Q2e
 			feature[i] = 1
 		else:
 			feature[i] = 0
+	if(fileName == '3677454_2025195.zip-1' or fileName == '3677454_2025195.zip-18'):
+		print(feature)
 	return (fileName, feature)
 
 def printfeature(name, arr):				#Q2f
@@ -96,13 +99,53 @@ def sign(fileName, feature):				#Q3a
 	return (fileName, bytes)
 
 def LSH(fileName, bytes):
-	hashes = np.zeros(shape=(8))
-	for i in range(8):
+	hashes = np.zeros(shape=(16))
+	for i in range(16):
 		arr = np.array(bytes)
-		row = i*16
-		val = arr[row:row+16]
+		row = i*8
+		val = arr[row:row+8]
 		hashes[i] = hash(val.tostring())
 	return (fileName, hashes)
+
+def similarity(hashValue, imageNames):
+	import re
+	images = re.split('[:]', imageNames)
+
+	for image in images:
+		if image.strip() == '3677454_2025195.zip-0':
+			return ('3677454_2025195.zip-0', images)
+		if image.strip() == '3677454_2025195.zip-1':
+			return ('3677454_2025195.zip-1', images)
+		if image.strip() == '3677454_2025195.zip-18':
+			return ('3677454_2025195.zip-18', images)
+		if image.strip() == '3677454_2025195.zip-19':
+			return ('3677454_2025195.zip-19', images)
+	return('',[])
+
+def printSimiliar(fileName, similiar_files):
+	if(fileName == '3677454_2025195.zip-1'):
+		i = 0
+		simi = []
+		for file in similiar_files:
+			if file.strip() != '3677454_2025195.zip-1':
+				simi.append(file.strip())
+				i += 1
+			if(i == 20):
+				break
+		print(fileName, simi)
+	elif(fileName == '3677454_2025195.zip-18'):
+		i = 0
+		simi = []
+		for file in similiar_files:
+			if file.strip() != '3677454_2025195.zip-18':
+				simi.append(file.strip())
+				i += 1
+			if(i == 20):
+				break
+		print(fileName, simi)
+
+	return (fileName, )
+			
 
 if __name__ == "__main__":
 
@@ -122,10 +165,10 @@ if __name__ == "__main__":
 	image_array = filesRdd.map(lambda a: a[1]).map(lambda x: getOrthoTif(x))	#Q1b
 	file_image_array = filesRdd.map(lambda a: (a[0][a[0].rfind("/")+1:], getOrthoTif(a[1])))
 	blocks = file_image_array.flatMap(lambda a:divideImage(a[0], a[1]))		#Q1d
-	#print_blocks = blocks.map(lambda a:printrgb(a[0], a[1]))			#Q1e
+	print_blocks = blocks.map(lambda a:printrgb(a[0], a[1]))			#Q1e
 	#print_blocks.collect()
 
-	intensity = blocks.map(lambda a:calculateIntensity(a[0], a[1]))			#Q2a
+	intensity = print_blocks.map(lambda a:calculateIntensity(a[0], a[1]))			#Q2a
 	reduced = intensity.map(lambda a:reduceFactor(a[0], a[1]))			#Q2b
 	major = reduced.map(lambda a:matrixDiff(a[0], a[1]))				#Q2c, Q2d and Q2e
 	#print_feature = major.map(lambda a:printfeature(a[0], a[1]))			#Q2f
@@ -135,7 +178,10 @@ if __name__ == "__main__":
 	band = signatures.map(lambda a:LSH(a[0], a[1]))
 	flip = band.flatMap(lambda a:[(x, a[0]+" : ") for x in a[1]])
 	similiar = flip.reduceByKey(lambda a,b:a+b)
-	print(similiar.collect())
+	similiar_combine = similiar.map(lambda a: similarity(a[0], a[1]))
+	similarImage = similiar_combine.reduceByKey(lambda a,b:a+b)
+	print_similarImage = similarImage.map(lambda a:printSimiliar(a[0], a[1]))
+	print_similarImage.collect()
 
 
 
